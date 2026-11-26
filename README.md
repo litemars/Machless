@@ -23,7 +23,7 @@ flowchart LR
     end
 
     subgraph DELIVERY["Controlled test delivery"]
-        D["4. Stage the artifact<br/>Placepayload on the test server"]
+        D["4. Stage the artifact<br/>Place payload on the test server"]
         E["5. Fetch and run<br/>Use the OSAScript delivery helper"]
 
         D --> E
