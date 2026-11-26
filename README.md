@@ -1,6 +1,8 @@
 # machless
 
-![machless logo](assets/machless.png)
+<div align="center">
+  <img src="assets/machless.png" width="300" alt="machless logo">
+</div>
 
 Apple Silicon Mach-O packer using Patrick Wardle's ReflectiveLoader. It maps a
 constructor-based dylib in the current process without writing the plaintext
