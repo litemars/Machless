@@ -8,6 +8,38 @@ Apple Silicon Mach-O packer using Patrick Wardle's ReflectiveLoader. It maps a
 constructor-based dylib in the current process without writing the plaintext
 dylib to disk.
 
+## How to use it
+
+
+
+```mermaid
+flowchart LR
+    subgraph BUILD["Build"]
+        A["1. Prepare the dylib<br/>Create a C example or use an existing dylib"]
+        B["2. Compile the dylib<br/><code>make -C examples/credential-dump</code>"]
+        C["3. Pack the dylib<br/><code>make pack INPUT=file.dylib OUTPUT=payload</code>"]
+
+        A --> B --> C
+    end
+
+    subgraph DELIVERY["Controlled test delivery"]
+        D["4. Stage the artifact<br/>Placepayload on the test server"]
+        E["5. Fetch and run<br/>Use the OSAScript delivery helper"]
+
+        D --> E
+    end
+
+    C --> D
+
+    classDef source fill:#eef2ff,stroke:#6366f1,color:#1e1b4b
+    classDef build fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    classDef delivery fill:#fff7ed,stroke:#f97316,color:#7c2d12
+
+    class A source
+    class B,C build
+    class D,E delivery
+```
+
 ## Build
 
 ```sh
@@ -35,50 +67,7 @@ Set `SIGN_IDENTITY=` to leave it unsigned, or
 `<output>.profile.h`. The profile is sufficient to unwrap the container key;
 normal builds keep it in a temporary file and remove the intermediate packed
 blob after the final link or requested signing pass.
-
-## Compatibility and limitations
-
-- The supported final-output path is Apple Silicon/ARM64 and defaults to a
-  macOS 15.0 deployment target. The generic container structures can describe
-  x86_64 slices, but the current final build and execution path does not.
-- Payloads must be 64-bit `MH_DYLIB` images built with
-  `-Wl,-no_fixup_chains`. The current packer/execution contract does not accept
-  modern `LC_DYLD_CHAINED_FIXUPS` payloads, executables, or bundles.
-- Execution is constructor-based. Initializers run synchronously in the
-  current process. A standalone packed executable exits after they return;
-  long-running payload work therefore needs to keep that process alive or use
-  the injectable-dylib path with an appropriate host.
-- Only the payload image is supplied from memory. Its dependent libraries are
-  still resolved through the system loader and must already be available or
-  loadable by the host.
-- The standalone outer executable still needs a disk-backed vnode for macOS
-  to launch it. An entirely network-to-memory flow requires an existing native
-  process that can load the injectable variant.
-- Anonymous executable mappings require a compatible host and signing profile.
-  Hardened-runtime deployments need the appropriate unsigned-executable-memory
-  allowances and are not the supported default configuration.
-- AEAD protects the embedded container from accidental or unauthenticated
-  modification and conceals plaintext at rest. It is not a DRM boundary:
-  someone with the complete executable can reconstruct the embedded key and
-  inspect the payload while it runs.
-
-## What changed in format 4
-
-- Each build gets a random container marker instead of the old `LCAM` magic.
-- The random payload key is XOR-split between the packed header and an encoded
-  build profile compiled into the loader. The packed bytes no longer contain
-  a directly usable decryption key.
-- The container is placed in `__DATA_CONST,__auth_const`, avoiding a custom
-  segment and stable packer-specific names. The loader finds the one valid
-  container by walking its non-executable mapped sections.
-- The source Mach-O buffer and resolved key are overwritten immediately after
-  ReflectiveLoader copies the image into its final segment mappings.
-- Final images use dead stripping, no exported symbols, local-symbol stripping,
-  single-cipher linking, ARM64-only payload selection, and per-build rewriting
-  of stable third-party loader name tokens before any requested signature.
-
-Repack version 3 containers before using the current loader.
-
+ 
 ## Credential example
 
 The three switches at the top of `examples/credential-dump/credentials.c`
@@ -91,20 +80,7 @@ select the collectors compiled into the example:
 ```
 
 The Keychain collector enumerates generic-password and internet-password
-records and requests each value with Security.framework. The browser collector
-requests the matching Safe Storage item and decrypts v10/v11 saved passwords.
-The file collector recursively checks bounded `.ssh`, `.aws`, `.azure`,
-`.kube`, and selected cloud/developer configuration locations. Keychain ACLs,
-Full Disk Access, and endpoint privacy controls still apply. The example has no
-networking, child-process, or persistence code.
-
-With `KEYCHAIN` or `BROWSER` enabled, the example asks Security.framework to
-open one native SecurityAgent secure password sheet. It prints that entered
-account/password pair, retains the password for the duration of the run, uses
-it to authorize each legacy Keychain and Safe Storage lookup, and restores
-each item's original ACL immediately after the read. Subsequent lookups are
-non-interactive, so cancelling the initial sheet does not create a series of
-password prompts. Records without a recovered secret are omitted from stdout.
+records and requests each value with Security.framework. 
 
 ```sh
 make -C examples/credential-dump
